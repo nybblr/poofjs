@@ -1,12 +1,23 @@
 {
-  "name": "poof.js",
+  "name": "poofjs",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
+  "bin": {
+    "poofjs": "./bin/poofjs"
+  },
   "scripts": {
     "start": "node --experimental-modules index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@babel/generator": "^7.6.0",
+    "@babel/parser": "^7.5.5",
+    "@babel/template": "^7.6.0",
+    "@babel/types": "^7.6.1",
+    "lodash.sortby": "^4.7.0"
+  }
 }
