@@ -1,11 +1,11 @@
 import {inspect} from 'util';
 import sortBy from 'lodash.sortby';
 
-import templator from "@babel/template";
+import templator from '@babel/template';
 import parser from '@babel/parser';
 import generator from '@babel/generator';
-import types from "@babel/types";
-import traverser from "@babel/traverse";
+import types from '@babel/types';
+import traverser from '@babel/types/lib/traverse/traverseFast.js';
 
 const {parse} = parser;
 const template = templator.default;
@@ -38,6 +38,15 @@ let getMarker = (node) =>
 
 let keyForMarker = ({ start, end }) => `${start}:${end}`;
 
+let getMarkerKey = (node) => {
+  let marker = getMarker(node);
+  if (!marker) { return; }
+  let key = types.stringLiteral(
+    keyForMarker(marker)
+  );
+  return key;
+};
+
 /*
  * TODO: use a worker thread,
  * or run directly in the shell.
@@ -68,34 +77,31 @@ let insertResults = (code, results) => {
 let poof = async (input) => {
   let code = input.toString();
   let ast = parse(code);
-  let {body} = ast.program;
-  // console.error(deep(body));
-  traverse(ast, {
-    enter(path) {
-      let s = path.node;
 
-      let marker = getMarker(s);
-      if (!marker) { return; }
-      let key = types.stringLiteral(
-        keyForMarker(marker)
-      );
-      //console.error(deep(statement));
-      switch (s.type) {
-        case 'ExpressionStatement': {
-          let expression = s.expression;
-          let newExpression = instrument({ key, expression });
-          s.expression = newExpression;
-          break;
-        }
-        case 'VariableDeclaration': {
-          let expression = s.declarations[0].init;
-          let newExpression = instrument({ key, expression });
-          s.declarations[0].init = newExpression;
-          break;
-        }
+  traverse(ast, (node) => {
+    switch (node.type) {
+      case 'ExpressionStatement': {
+        let key = getMarkerKey(node);
+        if (!key) { return; }
+
+        let expression = node.expression;
+        let newExpression = instrument({ key, expression });
+        node.expression = newExpression;
+        break;
+      }
+      case 'VariableDeclaration': {
+        let key = getMarkerKey(node);
+        if (!key) { return; }
+
+        let expression = node.declarations[0].init;
+        let newExpression = instrument({ key, expression });
+        node.declarations[0].init = newExpression;
+        break;
       }
     }
   });
+
+  let {body} = ast.program;
   ast.program.body = [...prefix(), ...body, ...suffix()];
   let output = generate(ast, { /* options */ }, code);
   let instrumentedCode = output.code;
