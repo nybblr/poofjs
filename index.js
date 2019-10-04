@@ -1,4 +1,5 @@
 import {inspect} from 'util';
+import vm from 'vm';
 import sortBy from 'lodash.sortby';
 
 import templator from '@babel/template';
@@ -15,7 +16,7 @@ const traverse = traverser.default;
 const prefix = template.statements(`
   let __poofSnoop = {};
   let __poof = (key, val) => {
-    __poofSnoop[key] = inspect(val, {depth: null});
+    __poofSnoop[key] = val;
     return val;
   };
 `);
@@ -52,14 +53,14 @@ let getMarkerKey = (node) => {
  * or run directly in the shell.
  */
 let runCode = (code) =>
-  eval(code);
+  vm.runInNewContext(code);
 
 let insertResults = (code, results) => {
   let chunks = [];
   let consumed = 0;
   let entries = sortBy(
     Object.entries(results)
-      .map(([key, res]) => [key.split(':').map(Number), res])
+      .map(([key, res]) => [key.split(':').map(Number), deep(res)])
   , r => r[0][0]);
   entries.forEach(([[start, end], res]) => {
     chunks.push(
