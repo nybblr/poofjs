@@ -14,21 +14,39 @@ const generate = generator.default;
 const traverse = traverser.default;
 
 const prefix = template.statements(`
-  let __poofSnoop = {};
-  let __poof = (key, val) => {
-    __poofSnoop[key] = val;
-    return val;
+  let __poof = (key, fn) => {
+    let caught = false;
+    let val;
+    try {
+      val = fn();
+    } catch (error) {
+      caught = true;
+      val = error;
+    }
+
+    __poofSnoop[key] = { caught, val };
+
+    if (caught) {
+      throw val;
+    } else {
+      return val;
+    }
   };
 `);
 const suffix = template.statements(`
-  __poofSnoop;
 `);
 const instrument = template.expression(`
-  __poof(%%key%%, %%expression%%)
+  __poof(%%key%%, () => %%expression%%)
 `);
 
 let deep = (data) =>
   inspect(data, {depth: null});
+
+let pretty = ({ caught, val }) =>
+  caught
+    ? `💥 ${val.toString()}`
+    : deep(val)
+;
 
 const MARKER = ' =>';
 
@@ -52,15 +70,22 @@ let getMarkerKey = (node) => {
  * TODO: use a worker thread,
  * or run directly in the shell.
  */
-let runCode = (code) =>
-  vm.runInNewContext(code);
+let runCode = (code) => {
+  let __poofSnoop = {};
+  try {
+    vm.runInNewContext(code, { __poofSnoop });
+  } catch (error) {
+    // Anything could have blown up!
+  }
+  return __poofSnoop;
+};
 
 let insertResults = (code, results) => {
   let chunks = [];
   let consumed = 0;
   let entries = sortBy(
     Object.entries(results)
-      .map(([key, res]) => [key.split(':').map(Number), deep(res)])
+      .map(([key, res]) => [key.split(':').map(Number), pretty(res)])
   , r => r[0][0]);
   entries.forEach(([[start, end], res]) => {
     chunks.push(
